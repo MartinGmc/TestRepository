@@ -81,7 +81,7 @@ jobs:
           LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 10 --insecure -I https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/)
           if [ -n "$LOCATION" ]; then
             echo "Checking redirect URL: $LOCATION"
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --insecure -L $LOCATION)
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --insecure -L "$LOCATION")
             CURL_EXIT=$?
             if [ $CURL_EXIT -ne 0 ]; then
               echo "Error: Could not connect to redirect URL $LOCATION (curl exit code: $CURL_EXIT)"
@@ -89,5 +89,10 @@ jobs:
             fi
             echo "redirect_status=$STATUS" >> $GITHUB_OUTPUT
             if [ "$STATUS" != "200" ]; then
-              echo "Redirect URL $LOCALI am getting this result:
-
+              echo "Redirect URL $LOCATION is not responding with status 200. Status code: $STATUS"
+              exit 1
+            else
+              echo "Redirect URL $LOCATION is up! Status code: $STATUS"
+            fi
+          fi
+        shell: bash
