@@ -20,7 +20,7 @@ jobs:
         id: check-google
         run: |
           echo "Checking www.google.com at $(date -u)" > google_response.log
-          STATUS=$(curl -s -w '%{http_code}' --max-time 10 -o google_response_body.html https://www.google.com)
+          STATUS=$(curl -s -v -w '%{http_code}' --max-time 10 -o google_response_body.html https://www.google.com 2>> google_response.log)
           CURL_EXIT=$?
           if [ $CURL_EXIT -ne 0 ]; then
             echo "Error: Could not connect to www.google.com (curl exit code: $CURL_EXIT)." >> google_response.log
@@ -57,9 +57,9 @@ jobs:
           echo "Checking portal.minv.sk at $(date -u)" > portal_response.log
           STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure -o portal_response_body.html https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
           CURL_EXIT=$?
+          echo "Curl exit code: $CURL_EXIT" >> portal_response.log
           if [ $CURL_EXIT -ne 0 ]; then
             echo "Error: Could not connect to portal.minv.sk (curl exit code: $CURL_EXIT)." >> portal_response.log
-            exit 1
           fi
           if [ -z "$STATUS" ]; then
             echo "Error: No status code received from portal.minv.sk." >> portal_response.log
@@ -70,12 +70,7 @@ jobs:
           if [ "$STATUS" == "302" ]; then
             echo "Note: 302 status indicates a redirect; response body may be empty." >> portal_response.log
           fi
-          if [ "$STATUS" != "200" ] && [ "$STATUS" != "302" ]; then
-            echo "portal.minv.sk is down! Status code: $STATUS" >> portal_response.log
-            exit 1
-          else
-            echo "portal.minv.sk is up! Status code: $STATUS" >> portal_response.log
-          fi
+          echo "portal.minv.sk is up! Status code: $STATUS" >> portal_response.log
         shell: bash
 
       - name: Upload Portal Response Log Artifact
@@ -92,8 +87,7 @@ jobs:
           name: portal-response-body
           path: portal_response_body.html
 
-      - name: Check Redirect URL (Optional)
-        if: steps.check-portal.outputs.status == '302'
+      - name: Check Redirect URL
         id: check-redirect
         run: |
           echo "Checking redirect URL at $(date -u)" > redirect_response.log
@@ -101,6 +95,7 @@ jobs:
           echo "Checking redirect URL: $REDIRECT_URL" >> redirect_response.log
           STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure -L -o redirect_response_body.html "$REDIRECT_URL" 2>> redirect_response.log)
           CURL_EXIT=$?
+          echo "Curl exit code: $CURL_EXIT" >> redirect_response.log
           if [ $CURL_EXIT -ne 0 ]; then
             echo "Error: Could not connect to redirect URL $REDIRECT_URL (curl exit code: $CURL_EXIT)" >> redirect_response.log
             exit 1
@@ -115,14 +110,14 @@ jobs:
         shell: bash
 
       - name: Upload Redirect Response Log Artifact
-        if: steps.check-portal.outputs.status == '302'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: redirect-response-log
           path: redirect_response.log
 
       - name: Upload Redirect Response Body Artifact
-        if: steps.check-portal.outputs.status == '302'
+        if: always()
         run: |
           if [ -f redirect_response_body.html ]; then
             echo "Uploading redirect_response_body.html as artifact"
@@ -139,3 +134,38 @@ jobs:
         with:
           name: redirect-response-body
           path: redirect_response_body.html
+
+      - name: Check Fallback URL
+        id: check-fallback
+        run: |
+          echo "Checking fallback URL portal.minv.sk at $(date -u)" > fallback_response.log
+          STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure -o fallback_response_body.html https://portal.minv.sk 2>> fallback_response.log)
+          CURL_EXIT=$?
+          echo "Curl exit code: $CURL_EXIT" >> fallback_response.log
+          if [ $CURL_EXIT -ne 0 ]; then
+            echo "Error: Could not connect to fallback URL https://portal.minv.sk (curl exit code: $CURL_EXIT)" >> fallback_response.log
+            exit 1
+          fi
+          echo "fallback_status=$STATUS" >> $GITHUB_OUTPUT
+          echo "Fallback URL status code: $STATUS" >> fallback_response.log
+          if [ "$STATUS" != "200" ]; then
+            echo "Fallback URL https://portal.minv.sk is not responding with status 200. Status code: $STATUS" >> fallback_response.log
+            exit 1
+          else
+            echo "Fallback URL https://portal.minv.sk is up! Status code: $STATUS" >> fallback_response.log
+          fi
+        shell: bash
+
+      - name: Upload Fallback Response Log Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fallback-response-log
+          path: fallback_response.log
+
+      - name: Upload Fallback Response Body Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fallback-response-body
+          path: fallback_response_body.html
