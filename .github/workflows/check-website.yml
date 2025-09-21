@@ -173,18 +173,3 @@ jobs:
         with:
           name: redirect-response-body
           path: redirect_response_body.html
-
-      - name: Send Email with Portal Response Log
-        if: always()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.mailgun.org
-          server_port: 587
-          username: ${{ secrets.MAILGUN_SMTP_USERNAME }}
-          password: ${{ secrets.MAILGUN_SMTP_PASSWORD }}
-          subject: Portal Response Log - $(date -u)
-          to: gmuca.martin@gmail.com
-          from: Mailgun Sender <pipe@sandboxf9809f09f020444c9d64126cc2fb8fb7.mailgun.org>
-          body: |
-            Portal Response Log:
-            $(cat portal_response.log)
