@@ -19,80 +19,98 @@ jobs:
       - name: Check Google Availability
         id: check-google
         run: |
+          echo "Checking www.google.com at $(date -u)" > google_response.log
           for attempt in {1..3}; do
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://www.google.com)
             if [ $? -eq 0 ]; then
               break
             else
-              echo "Attempt $attempt to reach www.google.com failed. Retrying in 5 seconds..."
+              echo "Attempt $attempt to reach www.google.com failed. Retrying in 5 seconds..." >> google_response.log
               sleep 5
             fi
           done
           if [ -z "$STATUS" ]; then
-            echo "Error: Could not connect to www.google.com after 3 attempts."
+            echo "Error: Could not connect to www.google.com after 3 attempts." >> google_response.log
             exit 1
           fi
           echo "status=$STATUS" >> $GITHUB_OUTPUT
           if [ "$STATUS" != "200" ]; then
-            echo "www.google.com is down! Status code: $STATUS"
+            echo "www.google.com is down! Status code: $STATUS" >> google_response.log
             exit 1
           else
-            echo "www.google.com is up! Status code: $STATUS"
+            echo "www.google.com is up! Status code: $STATUS" >> google_response.log
           fi
         shell: bash
+
+      - name: Upload Google Response Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-response
+          path: google_response.log
 
       - name: Check Portal Availability
         id: check-portal
         run: |
-          echo "Checking portal.minv.sk at $(date -u)"
-          # Capture status and full response
+          echo "Checking portal.minv.sk at $(date -u)" > portal_response.log
           STATUS=$(curl -s -w '%{http_code}' --max-time 10 --insecure https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ -o portal_response.log)
           LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 10 --insecure -I https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/)
           CURL_EXIT=$?
-          echo "Verbose curl output for portal.minv.sk:"
-          cat portal_response.log # Display full response
-          echo "Redirect URL (if any): $LOCATION"
+          echo "Verbose curl output for portal.minv.sk:" >> portal_response.log
+          cat portal_response.log >> portal_response.log # Append response
+          echo "Redirect URL (if any): $LOCATION" >> portal_response.log
           if [ $CURL_EXIT -ne 0 ]; then
-            echo "Error: Could not connect to portal.minv.sk (curl exit code: $CURL_EXIT)."
+            echo "Error: Could not connect to portal.minv.sk (curl exit code: $CURL_EXIT)." >> portal_response.log
             exit 1
           fi
           if [ -z "$STATUS" ]; then
-            echo "Error: No status code received from portal.minv.sk."
+            echo "Error: No status code received from portal.minv.sk." >> portal_response.log
             exit 1
           fi
           echo "status=$STATUS" >> $GITHUB_OUTPUT
-          # Treat 200 and 302 as valid
           if [ "$STATUS" != "200" ] && [ "$STATUS" != "302" ]; then
-            echo "portal.minv.sk is down! Status code: $STATUS"
+            echo "portal.minv.sk is down! Status code: $STATUS" >> portal_response.log
             exit 1
           else
-            echo "portal.minv.sk is up! Status code: $STATUS"
+            echo "portal.minv.sk is up! Status code: $STATUS" >> portal_response.log
             if [ -n "$LOCATION" ]; then
-              echo "Redirected to: $LOCATION"
+              echo "Redirected to: $LOCATION" >> portal_response.log
             fi
           fi
         shell: bash
+
+      - name: Upload Portal Response Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-response
+          path: portal_response.log
 
       - name: Check Redirect URL (Optional)
         if: steps.check-portal.outputs.status == '302'
         id: check-redirect
         run: |
-          echo "Checking redirect URL at $(date -u)"
+          echo "Checking redirect URL at $(date -u)" > redirect_response.log
           LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 10 --insecure -I https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/)
           if [ -n "$LOCATION" ]; then
-            echo "Checking redirect URL: $LOCATION"
+            echo "Checking redirect URL: $LOCATION" >> redirect_response.log
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --insecure -L "$LOCATION")
             CURL_EXIT=$?
             if [ $CURL_EXIT -ne 0 ]; then
-              echo "Error: Could not connect to redirect URL $LOCATION (curl exit code: $CURL_EXIT)"
+              echo "Error: Could not connect to redirect URL $LOCATION (curl exit code: $CURL_EXIT)" >> redirect_response.log
               exit 1
             fi
             echo "redirect_status=$STATUS" >> $GITHUB_OUTPUT
             if [ "$STATUS" != "200" ]; then
-              echo "Redirect URL $LOCATION is not responding with status 200. Status code: $STATUS"
+              echo "Redirect URL $LOCATION is not responding with status 200. Status code: $STATUS" >> redirect_response.log
               exit 1
             else
-              echo "Redirect URL $LOCATION is up! Status code: $STATUS"
+              echo "Redirect URL $LOCATION is up! Status code: $STATUS" >> redirect_response.log
             fi
           fi
         shell: bash
+
+      - name: Upload Redirect Response Artifact
+        if: steps.check-portal.outputs.status == '302'
+        uses: actions/upload-artifact@v4
+        with:
+          name: redirect-response
+          path: redirect_response.log
