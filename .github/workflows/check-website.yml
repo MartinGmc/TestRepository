@@ -47,14 +47,18 @@ jobs:
         id: check-portal
         run: |
           for attempt in {1..3}; do
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://portal.minv.sk)
+            STATUS=$(curl -v -s -o /dev/null -w '%{http_code}' --max-time 10 --insecure https://portal.minv.sk 2> curl_output.log)
             if [ $? -eq 0 ]; then
               break
             else
               echo "Attempt $attempt to reach portal.minv.sk failed. Retrying in 5 seconds..."
+              cat curl_output.log # Log curl errors for debugging
               sleep 5
             fi
           done
+
+          echo "Verbose curl output for portal.minv.sk:"
+          cat curl_output.log # Display curl output for debugging
 
           if [ -z "$STATUS" ]; then
             echo "Error: Could not connect to portal.minv.sk after 3 attempts."
@@ -69,17 +73,5 @@ jobs:
             echo "portal.minv.sk is up! Status code: $STATUS"
           fi
         shell: bash
-
-      - name: Create GitHub Issue on Failure
-        if: failure()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: 'Website Down',
-              body: `Website availability check failed. Last checked: ${{ github.event.schedule || 'manual trigger' }}.\n- www.google.com: Status code ${{ steps.check-google.outputs.status || 'unknown' }}\n- portal.minv.sk: Status code ${{ steps.check-portal.outputs.status || 'unknown' }}`
-            })
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
