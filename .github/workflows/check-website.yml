@@ -2,7 +2,7 @@ name: Check Website Availability
 
 on:
   schedule:
-    - cron: '*/20 * * * *' # Runs every 2 minutes
+    - cron: '*/2 * * * *' # Runs every 2 minutes
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -150,7 +150,19 @@ jobs:
           path: redirect_response.log
 
       - name: Upload Redirect Response Body Artifact
-        if: steps.check-portal.outputs.status == '302' && exists('redirect_response_body.html')
+        if: steps.check-portal.outputs.status == '302'
+        run: |
+          if [ -f redirect_response_body.html ]; then
+            echo "Uploading redirect_response_body.html as artifact"
+            echo "artifact_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "No redirect_response_body.html found; skipping artifact upload"
+            echo "artifact_exists=false" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Upload Redirect Response Body Artifact (Conditional)
+        if: steps.check-redirect.outputs.artifact_exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: redirect-response-body
