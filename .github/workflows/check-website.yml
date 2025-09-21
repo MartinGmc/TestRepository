@@ -55,8 +55,7 @@ jobs:
           STATUS=$(curl -s -w '%{http_code}' --max-time 10 --insecure https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ -o portal_response.log)
           LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 10 --insecure -I https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/)
           CURL_EXIT=$?
-          echo "Verbose curl output for portal.minv.sk:" >> portal_response.log
-          cat portal_response.log >> portal_response.log # Append response
+          echo "Verbose curl output for portal.minv.sk saved to portal_response.log" >> portal_response.log
           echo "Redirect URL (if any): $LOCATION" >> portal_response.log
           if [ $CURL_EXIT -ne 0 ]; then
             echo "Error: Could not connect to portal.minv.sk (curl exit code: $CURL_EXIT)." >> portal_response.log
