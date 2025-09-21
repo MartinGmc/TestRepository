@@ -2,6 +2,195 @@ name: Check Website Availability
 
 on:
   schedule:
+    - cron: '*/5 * * * *' # Runs every 5 minutes
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  check-website:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Update CA Certificates
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates
+          sudo update-ca-certificates
+
+      - name: Check Google Availability
+        id: check-google
+        run: |
+          echo "Checking www.google.com at $(date -u)" > google_response.log
+          for attempt in {1..3}; do
+            STATUS=$(curl -s -w '%{http_code}' --max-time 10 -o google_response_body.html https://www.google.com)
+            if [ $? -eq 0 ]; then
+              break
+            else
+              echo "Attempt $attempt to reach www.google.com failed. Retrying in 5 seconds..." >> google_response.log
+              sleep 5
+            fi
+          done
+          if [ -z "$STATUS" ]; then
+            echo "Error: Could not connect to www.google.com after 3 attempts." >> google_response.log
+            exit 1
+          fi
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "200" ]; then
+            echo "www.google.com is down! Status code: $STATUS" >> google_response.log
+            exit 1
+          else
+            echo "www.google.com is up! Status code: $STATUS" >> google_response.log
+          fi
+        shell: bash
+
+      - name: Upload Google Response Log Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-response-log
+          path: google_response.log
+
+      - name: Upload Google Response Body Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-response-body
+          path: google_response_body.html
+
+      - name: Check Portal Availability
+        id: check-portal
+        run: |
+          echo "Checking portal.minv.sk at $(date -u)" > portal_response.log
+          for attempt in {1..3}; do
+            STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure -o portal_response_body.html https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
+            CURL_EXIT=$?
+            if [ $CURL_EXIT -eq 0 ]; then
+              break
+            else
+              echo "Attempt $attempt to reach portal.minv.sk failed (curl exit code: $CURL_EXIT). Retrying in 5 seconds..." >> portal_response.log
+              sleep 5
+            fi
+          done
+          if [ $CURL_EXIT -ne 0 ]; then
+            echo "Error: Could not connect to portal.minv.sk after 3 attempts (curl exit code: $CURL_EXIT)." >> portal_response.log
+          fi
+          if [ -z "$STATUS" ]; then
+            echo "Error: No status code received from portal.minv.sk." >> portal_response.log
+            STATUS="0"
+          fi
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "Portal status code: $STATUS" >> portal_response.log
+          if [ "$STATUS" == "302" ]; then
+            echo "Note: 302 status indicates a redirect; response body may be empty." >> portal_response.log
+          fi
+          echo "Attempting to capture redirect URL for portal.minv.sk" >> portal_response.log
+          for attempt in {1..3}; do
+            LOCATION=$(curl -s -v -o /dev/null -w '%{url_effective}' --max-time 60 --insecure -L https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
+            CURL_REDIRECT_EXIT=$?
+            if [ $CURL_REDIRECT_EXIT -eq 0 ] && [ -n "$LOCATION" ] && [ "$LOCATION" != "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
+              echo "Redirect URL captured: $LOCATION" >> portal_response.log
+              break
+            else
+              echo "Attempt $attempt to capture redirect URL failed (exit code: $CURL_REDIRECT_EXIT). Retrying in 5 seconds..." >> portal_response.log
+              sleep 5
+            fi
+          done
+          if [ -z "$LOCATION" ] || [ "$LOCATION" == "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
+            echo "Warning: No valid redirect URL received from portal.minv.sk after 3 attempts." >> portal_response.log
+          else
+            echo "Redirect URL (if any): $LOCATION" >> portal_response.log
+          fi
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "302" ]; then
+            echo "portal.minv.sk is down! Status code: $STATUS" >> portal_response.log
+            exit 1
+          else
+            echo "portal.minv.sk is up! Status code: $STATUS" >> portal_response.log
+            if [ -n "$LOCATION" ] && [ "$LOCATION" != "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
+              echo "Redirected to: $LOCATION" >> portal_response.log
+            fi
+          fi
+        shell: bash
+
+      - name: Upload Portal Response Log Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-response-log
+          path: portal_response.log
+
+      - name: Upload Portal Response Body Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-response-body
+          path: portal_response_body.html
+
+      - name: Check Redirect URL (Optional)
+        if: steps.check-portal.outputs.status == '302'
+        id: check-redirect
+        run: |
+          echo "Checking redirect URL at $(date -u)" > redirect_response.log
+          LOCATION=$(curl -s -v -o /dev/null -w '%{url_effective}' --max-time 60 --insecure -L https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> redirect_response.log)
+          if [ -n "$LOCATION" ] && [ "$LOCATION" != "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
+            echo "Checking redirect URL: $LOCATION" >> redirect_response.log
+            STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure -L -o redirect_response_body.html "$LOCATION" 2>> redirect_response.log)
+            CURL_EXIT=$?
+            if [ $CURL_EXIT -ne 0 ]; then
+              echo "Error: Could not connect to redirect URL $LOCATION (curl exit code: $CURL_EXIT)" >> redirect_response.log
+              exit 1
+            fi
+            echo "redirect_status=$STATUS" >> $GITHUB_OUTPUT
+            if [ "$STATUS" != "200" ]; then
+              echo "Redirect URL $LOCATION is not responding with status 200. Status code: $STATUS" >> redirect_response.log
+              exit 1
+            else
+              echo "Redirect URL $LOCATION is up! Status code: $STATUS" >> redirect_response.log
+            fi
+          else
+            echo "No valid redirect URL provided; skipping redirect check." >> redirect_response.log
+          fi
+        shell: bash
+
+      - name: Upload Redirect Response Log Artifact
+        if: steps.check-portal.outputs.status == '302'
+        uses: actions/upload-artifact@v4
+        with:
+          name: redirect-response-log
+          path: redirect_response.log
+
+      - name: Upload Redirect Response Body Artifact
+        if: steps.check-portal.outputs.status == '302'
+        run: |
+          if [ -f redirect_response_body.html ]; then
+            echo "Uploading redirect_response_body.html as artifact"
+            echo "artifact_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "No redirect_response_body.html found; skipping artifact upload"
+            echo "artifact_exists=false" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Upload Redirect Response Body Artifact (Conditional)
+        if: steps.check-redirect.outputs.artifact_exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: redirect-response-body
+          path: redirect_response_body.html
+
+      - name: Send Email with Portal Response Log
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.mailgun.org
+          server_port: 587
+          username: ${{ secrets.MAILGUN_SMTP_USERNAME }}
+          password: ${{ secrets.MAILGUN_SMTP_PASSWORD }}
+          subject: Portal Response Log - $(date -u)
+          to: gmuca.martin@gmail.com
+          from: Mailgun Sender <pipe@sandboxf9809f09f020444c9d64126cc2fb8fb7.mailgun.org>
+          body: |
+            Portal Response Log:
+            $(cat portal_response.log)name: Check Website Availability
+
+on:
+  schedule:
     - cron: '*/5 * * * *' # Runs every 2 minutes
   workflow_dispatch: # Allows manual triggering
 
