@@ -2,19 +2,84 @@ name: Check Website Availability
 
 on:
   schedule:
-    - cron: '*/2 * * * *' # Runs every 30 minutes
-  workflow_dispatch:      # Allows manual triggering
+    - cron: '*/2 * * * *' # Runs every 2 minutes
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   check-website:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Check Website Status
+      - name: Update CA Certificates
         run: |
-          STATUS=$(curl -s -o /dev/null -w '%{http_code}' https://portal.minv.sk)
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates
+          sudo update-ca-certificates
+
+      - name: Check Google Availability
+        id: check-google
+        run: |
+          for attempt in {1..3}; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://www.google.com)
+            if [ $? -eq 0 ]; then
+              break
+            else
+              echo "Attempt $attempt to reach www.google.com failed. Retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+
+          if [ -z "$STATUS" ]; then
+            echo "Error: Could not connect to www.google.com after 3 attempts."
+            exit 1
+          fi
+
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
           if [ "$STATUS" != "200" ]; then
-            echo "Website is down! Status code: $STATUS"
+            echo "www.google.com is down! Status code: $STATUS"
             exit 1
           else
-            echo "Website is up! Status code: $STATUS"
+            echo "www.google.com is up! Status code: $STATUS"
           fi
+        shell: bash
+
+      - name: Check Portal Availability
+        id: check-portal
+        run: |
+          for attempt in {1..3}; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://portal.minv.sk)
+            if [ $? -eq 0 ]; then
+              break
+            else
+              echo "Attempt $attempt to reach portal.minv.sk failed. Retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+
+          if [ -z "$STATUS" ]; then
+            echo "Error: Could not connect to portal.minv.sk after 3 attempts."
+            exit 1
+          fi
+
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "200" ]; then
+            echo "portal.minv.sk is down! Status code: $STATUS"
+            exit 1
+          else
+            echo "portal.minv.sk is up! Status code: $STATUS"
+          fi
+        shell: bash
+
+      - name: Create GitHub Issue on Failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Website Down',
+              body: `Website availability check failed. Last checked: ${{ github.event.schedule || 'manual trigger' }}.\n- www.google.com: Status code ${{ steps.check-google.outputs.status || 'unknown' }}\n- portal.minv.sk: Status code ${{ steps.check-portal.outputs.status || 'unknown' }}`
+            })
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
