@@ -69,7 +69,7 @@ jobs:
           echo "Portal status code: $STATUS" >> portal_response.log
           if [ "$STATUS" == "302" ]; then
             echo "Note: 302 status indicates a redirect; response body may be empty." >> portal_response.log
-            LOCATION=$(curl -s -I -v --max-time 60 --insecure --header "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log | grep -i '^< Location:' | awk '{print $3}' | tr -d '\r')
+            LOCATION=$(grep -i '^< Location:' portal_response.log | awk '{print $3}' | tr -d '\r' | head -n 1)
             if [ -n "$LOCATION" ]; then
               echo "Redirect URL captured: $LOCATION" >> portal_response.log
               echo "location=$LOCATION" >> $GITHUB_OUTPUT
