@@ -2,7 +2,7 @@ name: Check Website Availability
 
 on:
   schedule:
-    - cron: '*/5 * * * *' # Runs every 5 minutes
+    - cron: '*/15 * * * *' # Runs every 15 minutes
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
         id: check-google
         run: |
           echo "Checking www.google.com at $(date -u)" > google_response.log
-          STATUS=$(curl -s -v -w '%{http_code}' --max-time 10 -o google_response_body.html https://www.google.com 2>> google_response.log)
+          STATUS=$(curl -s -v -w '%{http_code}' --max-time 10 --header "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o google_response_body.html https://www.google.com 2>> google_response.log)
           CURL_EXIT=$?
           if [ $CURL_EXIT -ne 0 ]; then
             echo "Error: Could not connect to www.google.com (curl exit code: $CURL_EXIT)." >> google_response.log
@@ -55,7 +55,7 @@ jobs:
         id: check-portal
         run: |
           echo "Checking portal.minv.sk at $(date -u)" > portal_response.log
-          STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure -o portal_response_body.html https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
+          STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure --header "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o portal_response_body.html https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
           CURL_EXIT=$?
           echo "Curl exit code: $CURL_EXIT" >> portal_response.log
           if [ $CURL_EXIT -ne 0 ]; then
@@ -69,6 +69,17 @@ jobs:
           echo "Portal status code: $STATUS" >> portal_response.log
           if [ "$STATUS" == "302" ]; then
             echo "Note: 302 status indicates a redirect; response body may be empty." >> portal_response.log
+            LOCATION=$(curl -s -I -v --max-time 60 --insecure --header "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log | grep -i '^< Location:' | awk '{print $3}' | tr -d '\r')
+            if [ -n "$LOCATION" ]; then
+              echo "Redirect URL captured: $LOCATION" >> portal_response.log
+              echo "location=$LOCATION" >> $GITHUB_OUTPUT
+            else
+              echo "Warning: No redirect URL received from portal.minv.sk." >> portal_response.log
+              echo "location=" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No redirect (non-302 status); skipping location capture." >> portal_response.log
+            echo "location=" >> $GITHUB_OUTPUT
           fi
           echo "portal.minv.sk is up! Status code: $STATUS" >> portal_response.log
         shell: bash
@@ -88,12 +99,13 @@ jobs:
           path: portal_response_body.html
 
       - name: Check Redirect URL
+        if: steps.check-portal.outputs.status == '302' && steps.check-portal.outputs.location != ''
         id: check-redirect
         run: |
           echo "Checking redirect URL at $(date -u)" > redirect_response.log
-          REDIRECT_URL="https://portal.minv.sk/wps/portal/domov/ecu/ecu_elektronicke_sluzby/ecu-vysys/!ut/p/a1/pZJNDoIwEEbP4gn6tZZCl60_bVEkqERlY1gZEkUXxvMLRBdorCbObpL3ZjozJQXZkqIub9WhvFbnujy2eSH2HKOJjWeIjVRDZEIzFaQpAN4AuwbAh1Do-1gGU2TUWJ0YMHD28D1Az4_suik6mwZWZoshDH3134GenyZUQOXJWiuZM5jn-0dGWR7O24kiBjfWdhzKBHDit_k9Df7yEfzpf-2_IUWHUMYc1asGiTIJZZwI2URTRPQL4PAAfDvsAN8n8Z6p3YIf4ORyyrvYonKVU4M7UEEQug!!/dl5/d5/L2dBISEvZ0FBIS9nQSEh/"
+          REDIRECT_URL="${{ steps.check-portal.outputs.location }}"
           echo "Checking redirect URL: $REDIRECT_URL" >> redirect_response.log
-          STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure -L -o redirect_response_body.html "$REDIRECT_URL" 2>> redirect_response.log)
+          STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure --header "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -L -o redirect_response_body.html "$REDIRECT_URL" 2>> redirect_response.log)
           CURL_EXIT=$?
           echo "Curl exit code: $CURL_EXIT" >> redirect_response.log
           if [ $CURL_EXIT -ne 0 ]; then
@@ -139,7 +151,7 @@ jobs:
         id: check-fallback
         run: |
           echo "Checking fallback URL portal.minv.sk at $(date -u)" > fallback_response.log
-          STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure -o fallback_response_body.html https://portal.minv.sk 2>> fallback_response.log)
+          STATUS=$(curl -s -v -w '%{http_code}' --max-time 60 --insecure --header "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o fallback_response_body.html https://portal.minv.sk 2>> fallback_response.log)
           CURL_EXIT=$?
           echo "Curl exit code: $CURL_EXIT" >> fallback_response.log
           if [ $CURL_EXIT -ne 0 ]; then
