@@ -48,8 +48,8 @@ jobs:
         run: |
           for attempt in {1..3}; do
             # Capture status and location header, with verbose output
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --insecure -I https://portal.minv.sk 2> curl_output.log)
-            LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 10 --insecure -I https://portal.minv.sk)
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --insecure -I https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2> curl_output.log)
+            LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 10 --insecure -I https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/)
             if [ $? -eq 0 ]; then
               break
             else
