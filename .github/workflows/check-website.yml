@@ -2,7 +2,7 @@ name: Check Website Availability
 
 on:
   schedule:
-    - cron: '*/2 * * * *' # Runs every 2 minutes
+    - cron: '*/20 * * * *' # Runs every 2 minutes
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -71,12 +71,15 @@ jobs:
           fi
           echo "status=$STATUS" >> $GITHUB_OUTPUT
           echo "Portal status code: $STATUS" >> portal_response.log
-          # Attempt to capture redirect URL with retries
+          if [ "$STATUS" == "302" ]; then
+            echo "Note: 302 status indicates a redirect; response body may be empty." >> portal_response.log
+          fi
+          # Attempt to capture redirect URL with retries using -L to follow redirects
           echo "Attempting to capture redirect URL for portal.minv.sk" >> portal_response.log
           for attempt in {1..3}; do
-            LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 10 --insecure -I https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/)
+            LOCATION=$(curl -s -o /dev/null -w '%{url_effective}' --max-time 10 --insecure -L https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
             CURL_REDIRECT_EXIT=$?
-            if [ $CURL_REDIRECT_EXIT -eq 0 ] && [ -n "$LOCATION" ]; then
+            if [ $CURL_REDIRECT_EXIT -eq 0 ] && [ -n "$LOCATION" ] && [ "$LOCATION" != "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
               echo "Redirect URL captured: $LOCATION" >> portal_response.log
               break
             else
@@ -84,8 +87,8 @@ jobs:
               sleep 5
             fi
           done
-          if [ -z "$LOCATION" ]; then
-            echo "Warning: No redirect URL received from portal.minv.sk after 3 attempts." >> portal_response.log
+          if [ -z "$LOCATION" ] || [ "$LOCATION" == "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
+            echo "Warning: No valid redirect URL received from portal.minv.sk after 3 attempts." >> portal_response.log
           else
             echo "Redirect URL (if any): $LOCATION" >> portal_response.log
           fi
@@ -94,7 +97,7 @@ jobs:
             exit 1
           else
             echo "portal.minv.sk is up! Status code: $STATUS" >> portal_response.log
-            if [ -n "$LOCATION" ]; then
+            if [ -n "$LOCATION" ] && [ "$LOCATION" != "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
               echo "Redirected to: $LOCATION" >> portal_response.log
             fi
           fi
@@ -107,6 +110,7 @@ jobs:
           path: portal_response.log
 
       - name: Upload Portal Response Body Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: portal-response-body
@@ -117,10 +121,10 @@ jobs:
         id: check-redirect
         run: |
           echo "Checking redirect URL at $(date -u)" > redirect_response.log
-          LOCATION=$(curl -s -o /dev/null -w '%{redirect_url}' --max-time 10 --insecure -I https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/)
-          if [ -n "$LOCATION" ]; then
+          LOCATION=$(curl -s -o /dev/null -w '%{url_effective}' --max-time 10 --insecure -L https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> redirect_response.log)
+          if [ -n "$LOCATION" ] && [ "$LOCATION" != "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
             echo "Checking redirect URL: $LOCATION" >> redirect_response.log
-            STATUS=$(curl -s -w '%{http_code}' --max-time 10 --insecure -L -o redirect_response_body.html "$LOCATION")
+            STATUS=$(curl -s -w '%{http_code}' --max-time 10 --insecure -L -o redirect_response_body.html "$LOCATION" 2>> redirect_response.log)
             CURL_EXIT=$?
             if [ $CURL_EXIT -ne 0 ]; then
               echo "Error: Could not connect to redirect URL $LOCATION (curl exit code: $CURL_EXIT)" >> redirect_response.log
@@ -133,6 +137,8 @@ jobs:
             else
               echo "Redirect URL $LOCATION is up! Status code: $STATUS" >> redirect_response.log
             fi
+          else
+            echo "No valid redirect URL provided; skipping redirect check." >> redirect_response.log
           fi
         shell: bash
 
@@ -144,7 +150,7 @@ jobs:
           path: redirect_response.log
 
       - name: Upload Redirect Response Body Artifact
-        if: steps.check-portal.outputs.status == '302'
+        if: steps.check-portal.outputs.status == '302' && exists('redirect_response_body.html')
         uses: actions/upload-artifact@v4
         with:
           name: redirect-response-body
