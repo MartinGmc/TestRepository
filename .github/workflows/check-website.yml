@@ -58,11 +58,18 @@ jobs:
         id: check-portal
         run: |
           echo "Checking portal.minv.sk at $(date -u)" > portal_response.log
-          STATUS=$(curl -s -w '%{http_code}' --max-time 10 --insecure -o portal_response_body.html https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/)
-          CURL_EXIT=$?
-          echo "Verbose curl output for portal.minv.sk saved to portal_response_body.html" >> portal_response.log
+          for attempt in {1..3}; do
+            STATUS=$(curl -s -w '%{http_code}' --max-time 30 --insecure -o portal_response_body.html https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
+            CURL_EXIT=$?
+            if [ $CURL_EXIT -eq 0 ]; then
+              break
+            else
+              echo "Attempt $attempt to reach portal.minv.sk failed (curl exit code: $CURL_EXIT). Retrying in 5 seconds..." >> portal_response.log
+              sleep 5
+            fi
+          done
           if [ $CURL_EXIT -ne 0 ]; then
-            echo "Error: Could not connect to portal.minv.sk (curl exit code: $CURL_EXIT)." >> portal_response.log
+            echo "Error: Could not connect to portal.minv.sk after 3 attempts (curl exit code: $CURL_EXIT)." >> portal_response.log
             exit 1
           fi
           if [ -z "$STATUS" ]; then
@@ -74,10 +81,10 @@ jobs:
           if [ "$STATUS" == "302" ]; then
             echo "Note: 302 status indicates a redirect; response body may be empty." >> portal_response.log
           fi
-          # Attempt to capture redirect URL with retries using -L to follow redirects
+          # Attempt to capture redirect URL with retries
           echo "Attempting to capture redirect URL for portal.minv.sk" >> portal_response.log
           for attempt in {1..3}; do
-            LOCATION=$(curl -s -o /dev/null -w '%{url_effective}' --max-time 10 --insecure -L https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
+            LOCATION=$(curl -s -o /dev/null -w '%{url_effective}' --max-time 30 --insecure -L https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> portal_response.log)
             CURL_REDIRECT_EXIT=$?
             if [ $CURL_REDIRECT_EXIT -eq 0 ] && [ -n "$LOCATION" ] && [ "$LOCATION" != "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
               echo "Redirect URL captured: $LOCATION" >> portal_response.log
@@ -121,10 +128,10 @@ jobs:
         id: check-redirect
         run: |
           echo "Checking redirect URL at $(date -u)" > redirect_response.log
-          LOCATION=$(curl -s -o /dev/null -w '%{url_effective}' --max-time 10 --insecure -L https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> redirect_response.log)
+          LOCATION=$(curl -s -o /dev/null -w '%{url_effective}' --max-time 30 --insecure -L https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/ 2>> redirect_response.log)
           if [ -n "$LOCATION" ] && [ "$LOCATION" != "https://portal.minv.sk/wps/portal/!ut/p/a1/jdFBD4IgGAbgn8QLIcoRygDLnJWrvDRPza2sQ-v3R60O1sK-G9vzMt4PUpMtqbvm1h6aa3vumuPjXIs9xzi12QyZkWqEUmimoqIAwD3YeYAfo9DPYxlNUVJjdW7AwNkrHwC9fGLX_tLZNLKyXIxg6Gf-G_TyRU4FVJWvtZIVg3m_f2yU5fH80ShhcBNtJ7HMASf-ywfAwP42pH4SypijeuVJUkoo40TMUk2R0AHg8AKhDk8Q-qRgTURDgJPLqfKzRetadwfspzGT/dl5/d5/L2dBISEvZ0FBIS9nQSEh/" ]; then
             echo "Checking redirect URL: $LOCATION" >> redirect_response.log
-            STATUS=$(curl -s -w '%{http_code}' --max-time 10 --insecure -L -o redirect_response_body.html "$LOCATION" 2>> redirect_response.log)
+            STATUS=$(curl -s -w '%{http_code}' --max-time 30 --insecure -L -o redirect_response_body.html "$LOCATION" 2>> redirect_response.log)
             CURL_EXIT=$?
             if [ $CURL_EXIT -ne 0 ]; then
               echo "Error: Could not connect to redirect URL $LOCATION (curl exit code: $CURL_EXIT)" >> redirect_response.log
